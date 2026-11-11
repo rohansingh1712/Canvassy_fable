@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(grep:*)",
+      "Bash(open \"http://localhost:5173/\")",
+      "Bash(find:*)",
+      "Bash(open:*)",
+      "Bash(lsof -ti:5174)",
+      "Bash(curl -s http://localhost:5174)",
+      "WebSearch",
+      "Bash(for file in \"/Users/singhroh/Desktop/ai experiements/canvassy/src/components\"/**/*.tsx)",
+      "Bash(do echo \"=== $file ===\" grep -E \"fontSize|lineHeight|padding|margin\" \"$file\")",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}
