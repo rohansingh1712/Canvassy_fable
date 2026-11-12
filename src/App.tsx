@@ -1,12 +1,10 @@
-import { CanvasMinimal } from './components/Canvas/CanvasMinimal';
+import { Canvas } from './components/Canvas/Canvas';
 import './theme/tokens.css';
+import './theme/prose.css';
+import './theme/motion.css';
 
 function App() {
-  return (
-    <div className="App">
-      <CanvasMinimal />
-    </div>
-  );
+  return <Canvas />;
 }
 
 export default App;

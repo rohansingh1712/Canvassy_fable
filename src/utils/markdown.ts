@@ -28,3 +28,14 @@ export function hasSummaryLine(bodyText: string): boolean {
     line.trim().startsWith('@summary ')
   );
 }
+
+/** What a note is called when collapsed: its @summary, else its first line of text. */
+export function cardTitle(body: string, summary?: string): string {
+  if (summary) return summary;
+  const firstLine = (body || '')
+    .split('\n')
+    .map((line) => stripMarkdown(line).replace(/^[-*+]\s+|^\d+\.\s+|^>\s*/, ''))
+    .find((line) => line.length > 0 && !line.startsWith('@summary'));
+  if (!firstLine) return '';
+  return firstLine.length > 90 ? `${firstLine.slice(0, 88).trimEnd()}…` : firstLine;
+}

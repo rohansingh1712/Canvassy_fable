@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
 import { useSettingsStore } from '../../store/settingsStore';
+import { X } from 'lucide-react';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
@@ -8,11 +8,7 @@ interface SettingsPanelProps {
 }
 
 export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
-  const { arrowWidth, arrowHeadSize, summaryMode, cardWidth, updateSettings, setSummaryMode, setCardWidth, loadSettings } = useSettingsStore();
-
-  useEffect(() => {
-    loadSettings();
-  }, [loadSettings]);
+  const { arrowWidth, arrowHeadSize, summaryMode, cardWidth, updateSettings, setSummaryMode, setCardWidth } = useSettingsStore();
 
   return (
     <>
@@ -22,14 +18,14 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
         <div className="settings-header">
           <h2>Settings</h2>
           <button className="settings-close" onClick={onClose} title="Close (Esc)">
-            ✕
+            <X size={16} />
           </button>
         </div>
 
         {/* Content */}
         <div className="settings-content">
           <div className="settings-section">
-            <h3>Arrow Appearance</h3>
+            <h3>Arrows</h3>
             <div className="slider-control">
               <label className="slider-label">Arrow Line Width</label>
               <div className="slider-row">
@@ -64,7 +60,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
           <div className="settings-divider" />
 
           <div className="settings-section">
-            <h3>Card Appearance</h3>
+            <h3>Notes</h3>
             <div className="settings-radio-group">
               <label className="settings-radio-label">
                 <input
@@ -120,7 +116,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
           <div className="settings-divider" />
 
           <div className="settings-section">
-            <h3>Summary Behavior</h3>
+            <h3>Summaries</h3>
             <div className="settings-radio-group">
               <label className="settings-radio-label">
                 <input

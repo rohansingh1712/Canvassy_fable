@@ -1,361 +1,228 @@
-import React, { useState, useEffect } from 'react';
-import { EdgeProps, getBezierPath } from 'reactflow';
-import { useCanvasStore } from '../../store/canvasStore';
+import { useCallback, useState } from 'react';
+import { EdgeProps, EdgeLabelRenderer, Position, getBezierPath, useStore, Node } from 'reactflow';
+import { ArrowRight, ArrowLeft, ArrowLeftRight, Minus, Type, Trash2 } from 'lucide-react';
+import { useCanvasStore, EdgeData } from '../../store/canvasStore';
 import { useSettingsStore } from '../../store/settingsStore';
+import { worldOf } from '../../game/worlds';
+import { Traveller } from '../../game/sprites';
 import './Connection.css';
 
-export function Connection({
-  id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
-  data,
-  markerEnd,
-}: EdgeProps) {
-  const [showPopover, setShowPopover] = useState(false);
-  const [editingLabel, setEditingLabel] = useState(false);
-  const [label, setLabel] = useState(data?.label || '');
-  const [tempLabel, setTempLabel] = useState(data?.label || '');
-  const { updateEdge, deleteEdge } = useCanvasStore();
-  const { arrowWidth, arrowHeadSize } = useSettingsStore();
+const LINE_STYLES: NonNullable<EdgeData['lineStyle']>[] = ['solid', 'dashed', 'dotted'];
+const DIRECTIONS: NonNullable<EdgeData['directionality']>[] = ['forward', 'both', 'backward', 'none'];
+const DIRECTION_ICON = { forward: ArrowRight, backward: ArrowLeft, both: ArrowLeftRight, none: Minus };
+const DASH = { solid: undefined, dashed: '7 6', dotted: '1 6' };
+const GAP = 6; // breathing room between a card edge and the line
 
+interface Anchor {
+  x: number;
+  y: number;
+  position: Position;
+}
+
+function rect(node: Node) {
+  const { x, y } = node.positionAbsolute ?? node.position;
+  return { x, y, w: node.width ?? 0, h: node.height ?? 0 };
+}
+
+/**
+ * Lines attach to whichever sides of the two cards face each other,
+ * and re-route as cards move, so arrows never double back through a card.
+ */
+function anchors(sourceNode: Node, targetNode: Node): [Anchor, Anchor] {
+  const a = rect(sourceNode);
+  const b = rect(targetNode);
+  const dx = b.x + b.w / 2 - (a.x + a.w / 2);
+  const dy = b.y + b.h / 2 - (a.y + a.h / 2);
+  const gapX = Math.abs(dx) - (a.w + b.w) / 2;
+  const gapY = Math.abs(dy) - (a.h + b.h) / 2;
+
+  const side = (r: typeof a, position: Position): Anchor => {
+    switch (position) {
+      case Position.Left:
+        return { x: r.x - GAP, y: r.y + r.h / 2, position };
+      case Position.Right:
+        return { x: r.x + r.w + GAP, y: r.y + r.h / 2, position };
+      case Position.Top:
+        return { x: r.x + r.w / 2, y: r.y - GAP, position };
+      default:
+        return { x: r.x + r.w / 2, y: r.y + r.h + GAP, position };
+    }
+  };
+
+  if (gapX >= gapY) {
+    return dx >= 0
+      ? [side(a, Position.Right), side(b, Position.Left)]
+      : [side(a, Position.Left), side(b, Position.Right)];
+  }
+  return dy >= 0
+    ? [side(a, Position.Bottom), side(b, Position.Top)]
+    : [side(a, Position.Top), side(b, Position.Bottom)];
+}
+
+export function Connection({ id, source, target, data, selected }: EdgeProps<EdgeData>) {
+  const sourceNode = useStore(useCallback((s) => s.nodeInternals.get(source), [source]));
+  const targetNode = useStore(useCallback((s) => s.nodeInternals.get(target), [target]));
+  const updateEdge = useCanvasStore((s) => s.updateEdge);
+  const deleteEdge = useCanvasStore((s) => s.deleteEdge);
+  const arrowWidth = useSettingsStore((s) => s.arrowWidth);
+  const arrowHeadSize = useSettingsStore((s) => s.arrowHeadSize);
+  const world = worldOf(useSettingsStore((s) => s.theme));
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  if (!sourceNode || !targetNode || !sourceNode.width || !targetNode.width) return null;
+
+  const [from, to] = anchors(sourceNode, targetNode);
   const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
+    sourceX: from.x,
+    sourceY: from.y,
+    sourcePosition: from.position,
+    targetX: to.x,
+    targetY: to.y,
+    targetPosition: to.position,
   });
 
   const lineStyle = data?.lineStyle || 'solid';
-  const directionality = data?.directionality || 'forward';
+  const direction = data?.directionality || 'forward';
+  const label = data?.label || '';
+  const hasEnd = direction === 'forward' || direction === 'both';
+  const hasStart = direction === 'backward' || direction === 'both';
+  const DirectionIcon = DIRECTION_ICON[direction];
+  const length = Math.hypot(to.x - from.x, to.y - from.y) * 1.15;
+  let seed = 0;
+  for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) % 9973;
 
-  const getStrokeDasharray = () => {
-    switch (lineStyle) {
-      case 'dashed':
-        return '5,5';
-      case 'dotted':
-        return '2,2';
-      default:
-        return 'none';
-    }
-  };
-
-  // Determine marker IDs based on directionality
-  const markerEndId = directionality === 'forward' || directionality === 'both'
-    ? `arrow-end-${id}`
-    : undefined;
-  const markerStartId = directionality === 'both' || directionality === 'backward'
-    ? `arrow-start-${id}`
-    : undefined;
-
-  const handleEdgeClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Open popover (don't toggle) if we're not editing the label
-    if (!editingLabel) {
-      setShowPopover(true);
-    }
-  };
-
-  const handleEdgeDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    // Start inline editing on double-click
-    setTempLabel(data?.label || '');
+  const startLabelEdit = () => {
+    setDraft(label);
     setEditingLabel(true);
-    setShowPopover(false);
   };
 
-  const closePopover = () => {
-    setShowPopover(false);
-  };
-
-  const handleDelete = () => {
-    deleteEdge(id);
-    setShowPopover(false);
-  };
-
-  const handleLineStyleChange = (style: string) => {
-    updateEdge(id, { lineStyle: style });
-  };
-
-  const handleDirectionalityChange = (dir: string) => {
-    updateEdge(id, { directionality: dir });
-  };
-
-  const handleLabelClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setTempLabel(data?.label || '');
-    setEditingLabel(true);
-    setShowPopover(false);
-  };
-
-  const handleLabelDoubleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-  };
-
-  const saveLabelEdit = () => {
-    setLabel(tempLabel);
-    updateEdge(id, { label: tempLabel });
+  const commitLabel = () => {
     setEditingLabel(false);
+    const next = draft.trim();
+    if (next !== label) updateEdge(id, { label: next });
   };
 
-  const cancelLabelEdit = () => {
-    setTempLabel(data?.label || '');
-    setEditingLabel(false);
-  };
+  const cycle = <T,>(list: T[], value: T) => list[(list.indexOf(value) + 1) % list.length];
 
-  const handleInlineLabelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTempLabel(e.target.value);
-  };
-
-  const handleInlineLabelKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      saveLabelEdit();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      cancelLabelEdit();
-    }
-  };
-
-  const handleInlineLabelBlur = () => {
-    saveLabelEdit();
-  };
-
-  // Sync label state with edge data
-  useEffect(() => {
-    setLabel(data?.label || '');
-  }, [data?.label]);
-
-  // Close popover when clicking outside
-  useEffect(() => {
-    if (!showPopover) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-
-      // Don't close if clicking on the popover itself or its children
-      if (target.closest('.connection-popover')) {
-        return;
-      }
-
-      // Close the popover
-      closePopover();
-    };
-
-    // Add a small delay to avoid immediately closing when opening
-    const timer = setTimeout(() => {
-      document.addEventListener('click', handleClickOutside);
-    }, 0);
-
-    return () => {
-      clearTimeout(timer);
-      document.removeEventListener('click', handleClickOutside);
-    };
-  }, [showPopover]);
-
-  // Handle keyboard shortcuts when popover is open
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!showPopover) return;
-
-      if (e.key === 'Escape') {
-        closePopover();
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        handleDelete();
-      }
-    };
-
-    if (showPopover) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [showPopover]);
+  const marker = (markerId: string, flip: boolean) => (
+    <marker
+      id={markerId}
+      viewBox="0 0 10 10"
+      refX={flip ? 1.5 : 8.5}
+      refY="5"
+      markerWidth={arrowHeadSize}
+      markerHeight={arrowHeadSize}
+      markerUnits="userSpaceOnUse"
+      orient="auto"
+    >
+      <path
+        d={flip ? 'M 8 1.5 L 1.5 5 L 8 8.5' : 'M 2 1.5 L 8.5 5 L 2 8.5'}
+        className="connection-marker"
+        strokeWidth={Math.max(1.2, (arrowWidth * 10) / arrowHeadSize)}
+      />
+    </marker>
+  );
 
   return (
     <>
-      {/* Arrow marker definitions - Chevron style */}
       <defs>
-        {markerEndId && (
-          <marker
-            id={markerEndId}
-            viewBox="0 0 10 10"
-            refX="8"
-            refY="5"
-            markerWidth={arrowHeadSize}
-            markerHeight={arrowHeadSize}
-            orient="auto"
-          >
-            <path
-              d="M 2 1 L 9 5 L 2 9"
-              fill="none"
-              stroke="var(--color-connection-default)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </marker>
-        )}
-        {markerStartId && (
-          <marker
-            id={markerStartId}
-            viewBox="0 0 10 10"
-            refX="2"
-            refY="5"
-            markerWidth={arrowHeadSize}
-            markerHeight={arrowHeadSize}
-            orient="auto"
-          >
-            <path
-              d="M 8 1 L 1 5 L 8 9"
-              fill="none"
-              stroke="var(--color-connection-default)"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </marker>
-        )}
+        {hasEnd && marker(`arrow-end-${id}`, false)}
+        {hasStart && marker(`arrow-start-${id}`, true)}
       </defs>
 
-      {/* Invisible wider path for easier clicking */}
-      <path
-        d={edgePath}
-        strokeWidth={20}
-        stroke="transparent"
-        fill="none"
-        onClick={handleEdgeClick}
-        onDoubleClick={handleEdgeDoubleClick}
-        style={{ cursor: 'pointer' }}
-      />
+      {/* In world themes the line is a road: a wide bed under the line, built as it appears */}
+      <path d={edgePath} className="connection-bed connection-bed--edge" pathLength={1} />
+      <path d={edgePath} className="connection-bed connection-bed--top" pathLength={1} />
+
+      {/* Wide invisible stroke so the line is easy to hit */}
+      <path d={edgePath} className="connection-hit" onDoubleClick={startLabelEdit} />
 
       <path
-        id={id}
-        className="react-flow__edge-path"
         d={edgePath}
-        style={{
-          strokeWidth: `${arrowWidth}px`,
-          '--arrow-width': `${arrowWidth}px`,
-          pointerEvents: 'none'
-        } as React.CSSProperties}
-        stroke="var(--color-connection-default)"
-        strokeDasharray={getStrokeDasharray()}
-        fill="none"
-        markerEnd={markerEndId ? `url(#${markerEndId})` : undefined}
-        markerStart={markerStartId ? `url(#${markerStartId})` : undefined}
+        className={`connection-path${selected ? ' is-selected' : ''}`}
+        style={{ strokeWidth: arrowWidth }}
+        strokeDasharray={DASH[lineStyle]}
+        strokeLinecap="round"
+        markerEnd={hasEnd ? `url(#arrow-end-${id})` : undefined}
+        markerStart={hasStart ? `url(#arrow-start-${id})` : undefined}
       />
 
-      {/* Label display with large click area */}
-      {!editingLabel && data?.label && (
-        <foreignObject
-          width={Math.max(data.label.length * 10, 100)}
-          height={40}
-          x={labelX - Math.max(data.label.length * 5, 50)}
-          y={labelY - 20}
-          className="connection-label-display"
-          style={{ overflow: 'visible' }}
-        >
-          <div
-            onClick={(e) => {
-              e.stopPropagation();
-              handleLabelClick(e as any);
-            }}
-            style={{
-              width: '100%',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              fontSize: '16px',
-              color: 'var(--color-text-secondary)',
-              fontFamily: 'var(--font-ui)',
-              textAlign: 'center',
-              padding: '4px 8px',
-              borderRadius: '4px',
-              background: 'rgba(253, 250, 245, 0.9)',
-              border: '1px solid transparent',
-              transition: 'all 0.15s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(253, 250, 245, 1)';
-              e.currentTarget.style.borderColor = 'var(--color-accent-soft)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(253, 250, 245, 0.9)';
-              e.currentTarget.style.borderColor = 'transparent';
-            }}
-          >
-            {data.label}
-          </div>
-        </foreignObject>
+      {/* Animated only in vibes that ask for it (see theme/motion.css) */}
+      <path d={edgePath} className="connection-flow" />
+
+      {world && direction !== 'backward' && (
+        <Traveller world={world.id} path={edgePath} length={length} seed={seed} />
+      )}
+      {world && direction !== 'forward' && (
+        <Traveller world={world.id} path={edgePath} length={length} seed={seed + 3} reverse />
       )}
 
-      {/* Inline label editor */}
-      {editingLabel && (
-        <foreignObject
-          width={200}
-          height={40}
-          x={labelX - 100}
-          y={labelY - 20}
-          className="connection-label-editor-wrapper"
+      <EdgeLabelRenderer>
+        <div
+          className={`connection-overlay nodrag nopan${selected ? ' is-selected' : ''}`}
+          style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
         >
-          <input
-            type="text"
-            value={tempLabel}
-            onChange={handleInlineLabelChange}
-            onKeyDown={handleInlineLabelKeyDown}
-            onBlur={handleInlineLabelBlur}
-            className="connection-label-inline-input"
-            autoFocus
-            placeholder="Label..."
-          />
-        </foreignObject>
-      )}
+          {editingLabel ? (
+            <input
+              className="connection-label-input"
+              value={draft}
+              autoFocus
+              placeholder="Label"
+              size={Math.max(draft.length, 6)}
+              onChange={(e) => setDraft(e.target.value)}
+              onFocus={(e) => e.target.select()}
+              onBlur={commitLabel}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitLabel();
+                if (e.key === 'Escape') setEditingLabel(false);
+                e.stopPropagation();
+              }}
+            />
+          ) : (
+            label && (
+              <button className="connection-label" onClick={startLabelEdit} title="Edit label">
+                {label}
+              </button>
+            )
+          )}
 
-      {showPopover && (
-        <foreignObject
-          width={300}
-          height={60}
-          x={labelX - 150}
-          y={labelY + 25}
-          className="connection-popover-wrapper"
-        >
-          <div className="connection-popover">
-            <div className="connection-popover-row">
-              <div className="connection-control">
-                <label>Style:</label>
-                <select
-                  value={lineStyle}
-                  onChange={(e) => handleLineStyleChange(e.target.value)}
-                >
-                  <option value="solid">Solid</option>
-                  <option value="dashed">Dashed</option>
-                  <option value="dotted">Dotted</option>
-                </select>
-              </div>
-
-              <div className="connection-control">
-                <label>Direction:</label>
-                <select
-                  value={directionality}
-                  onChange={(e) => handleDirectionalityChange(e.target.value)}
-                >
-                  <option value="forward">A → B</option>
-                  <option value="backward">B → A</option>
-                  <option value="both">A ↔ B</option>
-                  <option value="none">A — B</option>
-                </select>
-              </div>
+          {selected && !editingLabel && (
+            <div className="connection-toolbar">
+              <button
+                title={`Line: ${lineStyle} (click to change)`}
+                onClick={() => updateEdge(id, { lineStyle: cycle(LINE_STYLES, lineStyle) })}
+              >
+                <svg width="18" height="16" viewBox="0 0 18 16" aria-hidden>
+                  <line
+                    x1="2"
+                    y1="8"
+                    x2="16"
+                    y2="8"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeDasharray={lineStyle === 'solid' ? undefined : lineStyle === 'dashed' ? '4 3.5' : '0.5 4'}
+                  />
+                </svg>
+              </button>
+              <button
+                title={`Direction: ${direction} (click to change)`}
+                onClick={() => updateEdge(id, { directionality: cycle(DIRECTIONS, direction) })}
+              >
+                <DirectionIcon size={16} />
+              </button>
+              <button title={label ? 'Edit label' : 'Add label'} onClick={startLabelEdit}>
+                <Type size={15} />
+              </button>
+              <span className="connection-toolbar-sep" />
+              <button className="is-danger" title="Delete connection (⌫)" onClick={() => deleteEdge(id)}>
+                <Trash2 size={15} />
+              </button>
             </div>
-          </div>
-        </foreignObject>
-      )}
+          )}
+        </div>
+      </EdgeLabelRenderer>
     </>
   );
 }

@@ -1,292 +1,166 @@
-# Product Requirements Document (PRD)
+# Product requirements document (PRD)
 
-**Product Name:** Canvassy *(working title)*
-**Status:** Draft
-**Last Updated:** March 20, 2026
-**Implementation Status:** ✅ MVP Complete
+**Product name:** Canvassy *(working title)*
+**Status:** Personal prototype
+**Last updated:** November 11, 2026
 
 ---
 
 ## Overview
 
-Canvassy is a canvas-style note-taking web app that lets users think and write spatially. Users create notes in cards, arrange them freely on an infinite canvas, and connect them via arrows to map relationships between ideas. It also provides a focused, high-quality writing experience inside individual cards — supporting both the messy, exploratory phase of thinking and the deeper, focused phase of writing.
+Canvassy is a canvas-style note-taking web app that lets users think and write spatially. Users create notes in cards, arrange them freely on an infinite canvas, and connect them with arrows to map relationships between ideas. It also provides a focused writing experience inside individual cards—supporting both the messy, exploratory phase of thinking and the deeper, focused phase of writing.
+
+## Problem statement
+
+Writing and thinking are non-linear, but most note apps force a linear, hierarchical structure. Canvas tools (Miro, FigJam) are built for diagrams, not writing; note apps (Notion, Obsidian) are strong for writing but weak for spatial thinking. Canvassy bridges both.
+
+## Target user
+
+Personal use, single user, no collaboration. Someone who thinks non-linearly and wants spatial organization plus focused writing.
+
+## Guiding principle
+
+The app has to be enjoyable enough to reach for. That means standard gestures, no dead ends, nothing that blocks writing, and everything undoable.
 
 ---
 
-## Problem Statement
+## Features
 
-Writing and thinking are non-linear processes, but most note-taking apps force users to work in a linear, hierarchical structure (documents, folders, bullet lists). This creates friction when ideas are still forming — when you're brainstorming, outlining, or trying to see how thoughts relate to each other.
+### Canvas
+- Infinite canvas (React Flow) with a dot grid
+- Scroll to pan, pinch or ⌘-scroll to zoom, drag empty canvas to pan
+- Shift-drag to select several cards; ⌫ deletes the selection
+- View position and zoom persist across reloads
+- Empty-state hint when there are no notes
 
-Existing canvas tools (e.g. Miro, FigJam) are built for diagrams and collaboration, not writing. Existing note apps (e.g. Notion, Obsidian) are powerful for writing but weak for spatial thinking.
+### Notes (cards)
+- Create by double-clicking the canvas, pressing **N**, or the dock's + button; the new note takes the cursor immediately
+- Drag from anywhere on the card to move it; click to edit in place (Markdown via TipTap)
+- Delete is instant with an Undo toast—no confirmation
+- Word count shown on hover; amber past 500 words as a soft nudge (no hard limit)
+- Global card width setting (narrow / medium / wide)
 
-Canvassy bridges both: a spatial canvas for organizing ideas *and* a great writing experience inside each note.
+### Connections
+- Drag from a handle onto another card to connect
+- Drop the line on empty canvas to create a new, linked note
+- Lines choose the facing sides of both cards automatically and re-route when cards move
+- Select a line for a toolbar: line style, direction, label, delete; double-click to label
 
----
+### Summaries
+- A line starting with `@summary` becomes the note's title in summary view; otherwise the first line of text is used
+- Summary view via the dock or **S** (toggle mode), or automatically below 60% zoom (zoom mode, in settings)
 
-## Goals & Success Metrics
+### Focus mode
+- Full-screen single-note editor, opened from the card or with **⌘↵**; **Esc** returns to the canvas
+- Same typography as the card, scaled up
 
-The goal for this version is a working personal prototype — not a polished product. Success means the core loop works end to end.
+### Worlds (the game layer)
+Three themes turn the board into a place you build: **Village**, **City**, and **Outer space**. The note-taking is unchanged; every action just has a visible consequence in the world.
 
-### MVP Success Criteria ✅
-- ✅ A user can open the app and see an infinite canvas
-- ✅ A user can create, move, and delete cards on the canvas
-- ✅ A user can write in Markdown inside a card with live preview (both inline and full-screen)
-- ✅ A user can add a summary to a card that appears at the bottom
-- ✅ A user can connect two cards with an arrow and customize its label, direction, and line style
-- ✅ Zooming out past a threshold (60%) collapses cards to show only their summary
-- ✅ All data persists across page refreshes via localStorage
-- ✅ The codebase is structured so individual modules (theme, editor, canvas, connections) can be edited in isolation
+| You do | In the world |
+|---|---|
+| Create a note | Stake a plot: an empty lot, signpost, or beacon appears with a puff of dust |
+| Write | Each new word adds a resident (+1) and a hammer taps away. The note's building upgrades at 1, 25, 80, and 200 words (for example plot → camp → hut → cottage → windmill farm) |
+| Connect notes | A road, path, or star lane is laid between them, and villagers, cars, or ships start travelling it in the direction of the arrow |
+| Move a note | It lifts, then lands with a thud and dust |
+| Delete a note | Demolition burst (still undoable) |
+| Grow the board | Score = words + 10 per note + 10 per connection. The board ranks up through six names (Clearing → Camp → Hamlet → Village → Town → Kingdom, and equivalents) with a banner and fireworks |
 
----
+- A scoreboard (top left) shows the current rank, progress to the next, and counts of buildings, roads, and residents
+- Hover or edit a note to see its building name and progress to the next upgrade
+- Summary view doubles as a map view: notes collapse to a title under their building
+- Sounds are synthesised chiptune blips (each new word plays the next note of a scale); toggle with the speaker button in the scoreboard
+- Nothing is gated: ranks and levels are feedback, never requirements
 
-## Target Users
+### Vibes (themes)
+- Five non-game themes that change colour, fonts, shapes, and backdrop: Lamplight, Beach day, Afterhours, Playground, Midnight
+- Each vibe has its own level of motion, from still (Lamplight, Midnight) through gentle (Beach day) and lively (Playground) to loud (Afterhours)
+- The backdrop reacts while you drag or pan, and in Afterhours to typing
+- Picker in the dock; **T** cycles; choice persists
+- See DESIGN.md for tokens and how to add one
 
-**Primary user:** Personal use only (single user, no collaboration required at this stage).
+### Undo and redo
+- **⌘Z** / **⇧⌘Z** and dock buttons
+- Covers creating, deleting, moving, and connecting notes, connection edits, and text edits (one step per editing session)
+- History is per session (not persisted)
 
-The user is someone who thinks non-linearly and wants a tool that matches their mental process — not a structured document editor, not an overly freeform whiteboard. The sweet spot is spatial organization *plus* focused writing.
+### Export
+- PNG and PDF of the board (html2canvas + jsPDF)
 
----
+### Persistence
+- Notes, connections, view, and settings in localStorage; writes are debounced and flushed on unload
 
-## Features & Requirements
-
-### Core Canvas ✅
-- ✅ Infinite, pannable/zoomable canvas (React Flow)
-- ✅ Create note cards anywhere via double-click
-- ✅ Drag and reposition cards freely by header bar
-- ✅ Draw arrows between cards via connection handles
-- ✅ Smooth zoom in/out with trackpad/scroll wheel
-- ✅ MiniMap in bottom-right for navigation
-- ✅ Zoom controls in bottom-left (+/−, fit view, lock)
-
-### Zoom Behavior (Semantic Zoom) ✅
-- ✅ **Zoomed in (≥ 60%):** Full card content is visible and readable
-- ✅ **Zoomed out (< 60%):** Cards collapse and display only the user-written **summary**
-  - Compact size (280px width) with centered text
-  - Muted colors to reduce visual noise
-  - Connection handles remain functional
-  - Perfect for seeing the "shape" of thinking at a glance
-
-### Note Cards ✅
-- ✅ Each card has:
-  - A **header bar** (28px height, `#E2D9CC` background)
-    - Drag handle icon (row of dots)
-    - **Edit button** (✏️) — opens full-screen editor
-    - **Delete button** (🗑) — requires confirmation (click twice within 3 seconds)
-  - A **body** field (320px width, serif font)
-    - Click to edit inline with textarea
-    - Markdown preview when not editing
-    - Click Edit button for full-screen CodeMirror editor
-  - A **summary** field — distinct section at bottom
-    - Click to edit inline
-    - Shown exclusively when zoomed out < 60%
-  - A **word count** indicator (when body has content)
-    - Color-coded: gray → orange (450+) → red (500, limit reached)
-- ✅ **500 word limit** enforced — typing blocked at limit
-
-### Card Interactions ✅
-
-**Creating a card**
-- ✅ **Double-click** on canvas creates a new card at that position
-- ✅ Cards start with empty body and summary
-
-**Dragging a card**
-- ✅ Cards are dragged by the **header bar** only
-- ✅ Body and summary have `nodrag` class to prevent dragging
-- ✅ Cursor shows `grab` on header, `grabbing` while dragging
-
-**Deleting a card**
-- ✅ Click **delete icon** (🗑) in header — button turns red
-- ✅ Click again within 3 seconds to confirm deletion
-- ✅ Timeout resets if you wait too long (safety feature)
-- ✅ Deletes card and all connected edges automatically
-
-**Connecting cards**
-- ✅ Hover on card reveals **4 connection handles** (12px circles, brown `#8C7B6E`)
-- ✅ Positioned at top, right, bottom, left edges
-- ✅ Fade in/out with opacity transition (0.2s)
-- ✅ Drag from any handle to another card's handle
-- ✅ **Loose connection mode** — snaps to nearest handle within 50px radius
-- ✅ Handles functional even when card is zoomed out/collapsed
-
-### Writing Experience ✅
-
-**Two editing modes implemented:**
-
-**Inline Editing (Quick):**
-- ✅ Click card body or summary to edit in place
-- ✅ Textarea appears with matching styles
-- ✅ Blur to save and return to Markdown preview
-- ✅ No modal, stays in canvas context
-- ✅ Perfect for quick edits
-
-**Full-Screen Editor (Deep Focus):**
-- ✅ Click **Edit button** (✏️) in header
-- ✅ Full-screen overlay with backdrop blur
-- ✅ **TipTap WYSIWYG editor:**
-  - Rich text editing with formatting toolbar
-  - Real-time visual editing (no separate preview needed)
-  - Supports headings, bold, italic, lists, etc.
-  - Character count and word limit enforcement
-- ✅ Header shows word count badge with warnings
-- ✅ Summary input field at bottom
-- ✅ Close with **Escape** or close button
-- ✅ Click outside to close and save
-- ✅ Smooth animations (fade + slide-up, 300ms)
-- ✅ Calm, focused experience — Lora serif font, warm colors
-
-### Connections (Arrows) ✅
-- ✅ Users draw connections by dragging from handle to handle
-- ✅ **Loose connection mode** — auto-snaps within 50px radius
-- ✅ **Default:** solid line, 2px weight, brown color (`#8C7B6E`)
-- ✅ **Arrow markers implemented:**
-  - Forward (A → B): Arrowhead at end
-  - Backward (B → A): Arrowhead at start
-  - Both (A ↔ B): Arrowheads at both ends
-  - None (A — B): No arrowheads
-  - SVG markers dynamically generated per edge
-- ✅ **Invisible wider path** (20px) for easier clicking
-- ✅ **Label editing:**
-  - Double-click edge → Opens inline label editor with auto-focus
-  - Click existing label → Opens inline editor
-  - Press Enter to save, Escape to cancel, click away to save
-  - Labels displayed along connection midpoint with clickable background
-- ✅ **Single-click edge** opens popover with:
-  - Line style dropdown (solid/dashed/dotted)
-  - Directionality dropdown (A→B / B→A / A↔B / A—B)
-  - Close with Escape key or click elsewhere on canvas
-  - Delete connection with Delete/Backspace key when popover is open
-- ✅ All changes save immediately to localStorage
-
-### Canvas ✅
-- ✅ Single infinite canvas powered by React Flow
-- ✅ Warm parchment background (`#F5F0E8`)
-- ✅ No grid or dots — clean, minimal
-- ✅ **Settings Button** in top-right corner
-  - ⚙️ gear icon, 48x48px floating button
-  - Opens settings panel from right side
-  - Canvas remains fully interactive when panel is open
-- ✅ **Settings Panel**
-  - Slides in from right (400px wide)
-  - No backdrop - canvas fully usable while open
-  - Close with Escape, X button, or Done button
-  - Ready for interface concept testing
-- ✅ **MiniMap** in bottom-right corner
-  - Shows overview of all cards
-  - Click to navigate quickly
-  - Styled with warm theme colors
-- ✅ **Zoom Controls** in bottom-left
-  - Zoom in/out buttons (+/−)
-  - Fit view button (centers all content)
-  - Lock/unlock interaction
-  - Styled to match theme
-
-### Persistence ✅
-- ✅ All canvas state saved to **localStorage** as JSON
-  - Card positions, body, summary, word count
-  - Connection data (style, direction, label, handles)
-  - Auto-save on every change
-- ✅ Data persists across page refreshes
-- ✅ Default welcome card on first load with instructions
+### Keyboard shortcuts
+| Action | Keys |
+|---|---|
+| New note | N |
+| Delete selection | ⌫ |
+| Undo / redo | ⌘Z / ⇧⌘Z |
+| Focus mode | ⌘↵ in a note |
+| Stop editing | Esc |
+| Summaries | S |
+| Next world or vibe | T |
+| Fit everything / 100% | 1 / 0 |
+| Shortcut list | ? |
 
 ---
 
-## Out of Scope
+## Out of scope
 
-- Multiple canvases or project-level organization
-- Multiplayer / collaboration features
-- AI-generated summaries (summaries are always user-written)
-- Mobile app (web only for now)
+- Multiple canvases
+- Collaboration
+- AI-generated summaries
+- Mobile
+
+## Ideas for later
+
+- Search across notes
+- Per-card colour or size
+- Duplicate and copy/paste cards
+- Tidy-up / auto-layout
+- Multiple boards
 
 ---
 
-## Technical Considerations
+## Technical notes
 
-### Stack ✅
-- **Framework:** React 18 + TypeScript
-- **Canvas / Graph engine:** React Flow 11 — handles infinite canvas, node dragging, edge drawing, zoom, and pan
-- **State management:** Zustand 4 — lightweight, single-user app, clean store patterns
-- **Rich text editor:**
-  - `@tiptap/react` — Modern WYSIWYG editor (user-modified from CodeMirror)
-  - `@tiptap/starter-kit` — Essential editing features
-  - Extensions: Placeholder, CharacterCount
-  - Full-screen editor with word limit enforcement
-- **Markdown rendering:** `react-markdown` — for inline card preview
-- **Persistence:** localStorage (JSON) — local-only, no backend
-- **Styling:** Inline styles + component CSS modules — warm color palette throughout
-- **Build:** Vite — fast dev server with HMR
-
-### Module Structure ✅
-
-The codebase is structured so each major concern lives in its own isolated folder:
+**Stack:** React 18, TypeScript, Vite, React Flow 11, Zustand, TipTap 3 (+ tiptap-markdown), lucide-react.
 
 ```
 src/
   components/
-    Canvas/
-      CanvasMinimal.tsx    ← Main canvas component with React Flow
-      CanvasMinimal.css    ← Canvas styling (settings button)
-      Canvas.tsx           ← (Legacy, CanvasMinimal is used in App.tsx)
-    Card/
-      Card.tsx             ← Card component with inline editing, semantic zoom
-      Card.css             ← Card-specific styles
-    CardEditor/
-      CardEditor.tsx       ← Full-screen editor with CodeMirror + live preview
-      CardEditor.css       ← Editor modal styling
-    Connection/
-      Connection.tsx       ← Arrow component with markers, popover, customization
-      Connection.css       ← Connection styling
-    Settings/
-      SettingsPanel.tsx    ← Settings panel that slides from right
-      SettingsPanel.css    ← Panel styling and animations
-    Help/                  ← Help component
-  theme/
-    tokens.css             ← Design tokens (colors, spacing, typography)
+    Canvas/       Canvas.tsx — React Flow setup, gestures, keyboard shortcuts
+    Card/         Card.tsx — note card with inline editor and summary view
+    CardEditor/   CardEditor.tsx — focus mode
+    Connection/   Connection.tsx — self-routing arrows, label, toolbar
+    Backdrop/     Backdrop.tsx — animated layers behind the canvas, per vibe
+    Dock/         Dock.tsx (toolbar, vibe picker, shortcuts), Toast.tsx
+    Export/       Export.tsx — PNG/PDF
+    Settings/     SettingsPanel.tsx — arrow size, card width, summary mode
+  game/
+    worlds.ts     world definitions, level and rank thresholds
+    sprites.tsx   procedural pixel art: buildings, travellers, terrain tiles
+    World.tsx     terrain layer and scoreboard (HUD)
+    game.ts       what each action triggers; fx.ts particles; sfx.ts sounds
+    game.css      all world-only styling
   store/
-    canvasStore.ts         ← Zustand store: cards, connections, localStorage
-  utils/
-    markdown.ts            ← Markdown helpers
-    wordCount.ts           ← Word count logic
+    canvasStore.ts    notes, connections, undo history, persistence
+    settingsStore.ts  settings and current theme
+  theme/
+    tokens.css    design tokens and theme definitions
+    prose.css     shared writing typography
+    motion.css    per-vibe motion on notes, arrows, and the dock
+    themes.ts     theme list for the picker
+  utils/          markdown, word count, @summary highlighting
 ```
 
-### Agent Surface Areas
-| Concern | Folder / File |
+| Concern | Where |
 |---|---|
-| Color themes & visual design | `theme/tokens.css` |
-| Writing / Markdown experience | `components/CardEditor/` |
-| Canvas zoom, pan, background | `components/Canvas/` |
-| Arrows, connections, line styles | `components/Connection/` |
-| Card structure & summary | `components/Card/` |
-
----
-
-## Implementation Notes
-
-**Edit Button Placement:** ✅ Resolved
-- Placed in card header bar, between drag handle and delete button
-- Uses ✏️ emoji icon for clear affordance
-- Opens full-screen CardEditor modal
-
-**Editing Modes:** ✅ Implemented both approaches
-- Inline editing for quick changes (click body/summary)
-- Full-screen editor for focused writing (click Edit button)
-- Both modes use same data store, seamless transitions
-
-**Semantic Zoom Threshold:** ✅ Set at 60%
-- Cards collapse to summary-only view below 60% zoom
-- Threshold feels natural for overview vs detail work
-
-**Connection Snapping:** ✅ Loose mode with 50px radius
-- Makes connecting cards much easier
-- Eliminates need for pixel-perfect handle targeting
-
-## Future Enhancements (Out of MVP Scope)
-
-- Export to PDF/Markdown
-- Search across all cards
-- Tags or categories
-- Multiple canvas workspaces
-- Keyboard shortcuts (beyond Escape)
-- Custom themes / color schemes
-- AI-assisted features (summaries, connections)
-
----
+| Game rules (levels, ranks, names) | `game/worlds.ts` |
+| Pixel art | `game/sprites.tsx` |
+| Vibes, colours, fonts | `theme/tokens.css`, `theme/themes.ts` |
+| Writing typography | `theme/prose.css` |
+| Gestures and shortcuts | `components/Canvas/Canvas.tsx` |
+| Card behaviour | `components/Card/` |
+| Arrows | `components/Connection/` |
+| Undo, saving | `store/canvasStore.ts` |

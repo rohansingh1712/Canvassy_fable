@@ -1,190 +1,227 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
-  Controls,
-  useReactFlow,
+  BackgroundVariant,
+  ConnectionLineType,
+  ConnectionMode,
+  OnConnectStartParams,
   ReactFlowProvider,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useCanvasStore } from '../../store/canvasStore';
+import { useCanvasStore, loadViewport, saveViewport } from '../../store/canvasStore';
+import { useSettingsStore, CARD_WIDTHS } from '../../store/settingsStore';
 import { Card } from '../Card/Card';
 import { Connection } from '../Connection/Connection';
-import { Help } from '../Help/Help';
+import { Backdrop } from '../Backdrop/Backdrop';
+import { Dock } from '../Dock/Dock';
+import { Toast } from '../Dock/Toast';
+import { SettingsPanel } from '../Settings/SettingsPanel';
+import { Hud } from '../../game/World';
+import { game } from '../../game/game';
+import { worldOf } from '../../game/worlds';
 import './Canvas.css';
 
-const nodeTypes = {
-  customCard: Card,
-};
+const nodeTypes = { customCard: Card };
+const edgeTypes = { default: Connection };
+const initialViewport = loadViewport();
 
-const edgeTypes = {
-  customEdge: Connection,
+const isTyping = (target: EventTarget | null) => {
+  const el = target as HTMLElement | null;
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
 };
 
 function CanvasContent() {
-  const {
-    nodes,
-    edges,
-    addCard,
-    onNodesChange,
-    onEdgesChange,
-    onConnect,
-    loadFromLocalStorage,
-    setDraggingNodeId,
-  } = useCanvasStore();
+  const nodes = useCanvasStore((s) => s.nodes);
+  const edges = useCanvasStore((s) => s.edges);
+  const isConnecting = useCanvasStore((s) => s.isConnecting);
+  const { addCard, connectNodes, onNodesChange, onEdgesChange, onConnect, setConnecting, snapshot } =
+    useCanvasStore.getState();
+  const cardWidth = useSettingsStore((s) => s.cardWidth);
+  const world = worldOf(useSettingsStore((s) => s.theme));
+  const { screenToFlowPosition, fitView, zoomTo, getZoom } = useReactFlow();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  // True while a note is dragged or the view is panned/zoomed; vibes react to it.
+  const [moving, setMoving] = useState(false);
+  const connectStart = useRef<OnConnectStartParams | null>(null);
+  const didConnect = useRef(false);
+  const width = CARD_WIDTHS[cardWidth].full;
 
-  const { screenToFlowPosition, getViewport, setViewport, fitView } = useReactFlow();
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const clickTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const clickCountRef = useRef(0);
-  const [isSpacebarHeld, setIsSpacebarHeld] = useState(false);
+  const addCardAtScreenPoint = useCallback(
+    (clientX: number, clientY: number) => {
+      // Centre the note under the pointer, but keep it fully on screen.
+      const onScreen = width * getZoom();
+      const left = Math.max(16, Math.min(clientX - onScreen / 2, window.innerWidth - onScreen - 16));
+      const top = Math.max(16, clientY - 40 * getZoom());
+      addCard(screenToFlowPosition({ x: left, y: top }));
+    },
+    [screenToFlowPosition, getZoom, addCard, width]
+  );
 
-  useEffect(() => {
-    loadFromLocalStorage();
-  }, [loadFromLocalStorage]);
-
-  // Spacebar navigation mode
+  // Keyboard shortcuts (ignored while typing in a note or field)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only activate if spacebar is pressed and we're not in an input field
-      if (e.code === 'Space' && !isSpacebarHeld) {
-        const target = e.target as HTMLElement;
-        const isInputField = target.tagName === 'INPUT' ||
-                            target.tagName === 'TEXTAREA' ||
-                            target.isContentEditable;
+      if (document.querySelector('.card-editor-overlay')) return;
+      const mod = e.metaKey || e.ctrlKey;
 
-        if (!isInputField) {
-          e.preventDefault(); // Prevent page scroll
-          setIsSpacebarHeld(true);
-        }
+      if (isTyping(e.target)) return;
+
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) useCanvasStore.getState().redo();
+        else useCanvasStore.getState().undo();
+        return;
+      }
+      if (mod || e.altKey) return;
+
+      switch (e.key) {
+        case 'n':
+        case 'N':
+          e.preventDefault();
+          addCardAtScreenPoint(window.innerWidth / 2, window.innerHeight / 2 - 60);
+          break;
+        case 'Backspace':
+        case 'Delete':
+          if (useCanvasStore.getState().deleteSelected()) e.preventDefault();
+          break;
+        case 's':
+        case 'S':
+          useSettingsStore.getState().toggleSummaries();
+          break;
+        case 't':
+        case 'T':
+          useSettingsStore.getState().cycleTheme();
+          break;
+        case '1':
+          fitView({ duration: 300, padding: 0.2, maxZoom: 1 });
+          break;
+        case '0':
+          zoomTo(1, { duration: 300 });
+          break;
+        case '?':
+          setHelpOpen((open) => !open);
+          break;
+        case 'Escape':
+          setSettingsOpen(false);
+          setHelpOpen(false);
+          break;
       }
     };
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        setIsSpacebarHeld(false);
-      }
-    };
-
-    // Reset spacebar state when window loses focus (e.g., cmd+tab)
-    const handleBlur = () => {
-      setIsSpacebarHeld(false);
-    };
-
     window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('blur', handleBlur);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [addCardAtScreenPoint, fitView, zoomTo]);
 
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('keyup', handleKeyUp);
-      window.removeEventListener('blur', handleBlur);
-    };
-  }, [isSpacebarHeld]);
-
-  const handlePaneClick = useCallback((event: React.MouseEvent) => {
-    console.log('Pane clicked');
-    clickCountRef.current += 1;
-
-    if (clickTimerRef.current) {
-      clearTimeout(clickTimerRef.current);
+  const handleDoubleClick = (event: React.MouseEvent) => {
+    if ((event.target as HTMLElement).classList.contains('react-flow__pane')) {
+      addCardAtScreenPoint(event.clientX, event.clientY);
     }
+  };
 
-    if (clickCountRef.current === 2) {
-      console.log('Double click detected via click counter!');
-      const position = screenToFlowPosition({
-        x: event.clientX,
-        y: event.clientY,
-      });
-      console.log('Creating card at flow position:', position);
-      console.log('Screen coords:', event.clientX, event.clientY);
-      addCard(position);
-      clickCountRef.current = 0;
-    } else {
-      clickTimerRef.current = setTimeout(() => {
-        clickCountRef.current = 0;
-      }, 300);
-    }
-  }, [screenToFlowPosition, addCard]);
+  // Dropping a line on a card connects to it; dropping on empty canvas creates a linked note there.
+  const handleConnectEnd = (event: MouseEvent | TouchEvent) => {
+    const start = connectStart.current;
+    connectStart.current = null;
+    setConnecting(false);
+    if (didConnect.current || !start?.nodeId) return;
 
-  const handleNodeDragStart = useCallback((_event: React.MouseEvent, node: Node) => {
-    setDraggingNodeId(node.id);
-  }, [setDraggingNodeId]);
+    const point = 'changedTouches' in event ? event.changedTouches[0] : event;
+    const target = document.elementFromPoint(point.clientX, point.clientY) as HTMLElement | null;
+    if (!target) return;
 
-  const handleNodeDragStop = useCallback(() => {
-    setDraggingNodeId(null);
-  }, [setDraggingNodeId]);
-
-  useEffect(() => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper) {
-      console.log('No wrapper ref');
+    const nodeEl = target.closest('.react-flow__node');
+    if (nodeEl) {
+      const targetId = nodeEl.getAttribute('data-id');
+      if (targetId) connectNodes(start.nodeId, targetId);
       return;
     }
 
-    const handleDoubleClick = (event: MouseEvent) => {
-      console.log('Double click detected!', event);
-      const target = event.target as HTMLElement;
-      console.log('Target classes:', target.className);
-
-      // Check if the target is the pane (not a node or edge)
-      const isPane = target.classList.contains('react-flow__pane') ||
-                     target.classList.contains('react-flow__renderer') ||
-                     target.classList.contains('react-flow__background');
-
-      console.log('Is pane?', isPane);
-
-      if (isPane) {
-        // Convert screen coordinates to flow coordinates
-        const position = screenToFlowPosition({
-          x: event.clientX,
-          y: event.clientY,
-        });
-
-        console.log('Creating card at position:', position);
-        addCard(position);
-      }
-    };
-
-    console.log('Adding dblclick listener to wrapper');
-    wrapper.addEventListener('dblclick', handleDoubleClick);
-
-    return () => {
-      wrapper.removeEventListener('dblclick', handleDoubleClick);
-    };
-  }, [screenToFlowPosition, addCard]);
-
-  console.log('Store nodes:', nodes);
+    if (target.classList.contains('react-flow__pane')) {
+      const drop = screenToFlowPosition({ x: point.clientX, y: point.clientY });
+      const offset: Record<string, { x: number; y: number }> = {
+        right: { x: 0, y: -40 },
+        left: { x: -width, y: -40 },
+        bottom: { x: -width / 2, y: 0 },
+        top: { x: -width / 2, y: -110 },
+      };
+      const by = offset[start.handleId ?? 'right'] ?? offset.right;
+      addCard({ x: drop.x + by.x, y: drop.y + by.y }, { linkFrom: start.nodeId });
+    }
+  };
 
   return (
-    <div className={`canvas-wrapper ${isSpacebarHeld ? 'nav-mode' : ''}`} ref={wrapperRef}>
-      <Help />
-      <div style={{ width: '100%', height: '100%' }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={onConnect}
-          onPaneClick={handlePaneClick}
-          onNodeDragStart={handleNodeDragStart}
-          onNodeDragStop={handleNodeDragStop}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          panOnDrag={isSpacebarHeld}
-          panOnScroll={false}
-          zoomOnScroll={false}
-          zoomOnPinch={false}
-          zoomOnDoubleClick={false}
-          preventScrolling={true}
-          nodesDraggable={!isSpacebarHeld}
-          nodesConnectable={false}
-          elementsSelectable={false}
-          selectNodesOnDrag={false}
-          fitView
-        >
-          <Background color="var(--color-card-border)" />
-        </ReactFlow>
-      </div>
+    <div className={`canvas-wrapper${isConnecting ? ' is-connecting' : ''}`} onDoubleClick={handleDoubleClick}>
+      <Backdrop moving={moving} />
+
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={(connection) => {
+          didConnect.current = true;
+          onConnect(connection);
+        }}
+        onConnectStart={(_event, params) => {
+          connectStart.current = params;
+          didConnect.current = false;
+          setConnecting(true);
+        }}
+        onConnectEnd={handleConnectEnd}
+        onNodeDragStart={() => {
+          snapshot();
+          (document.activeElement as HTMLElement | null)?.blur?.();
+          setMoving(true);
+        }}
+        onNodeDragStop={(_event, node) => {
+          setMoving(false);
+          game.drop(document.querySelector<HTMLElement>(`.react-flow__node[data-id="${node.id}"] .card`));
+        }}
+        onMoveStart={(event) => event && setMoving(true)}
+        onMoveEnd={(_event, viewport) => {
+          saveViewport(viewport);
+          setMoving(false);
+        }}
+        connectionMode={ConnectionMode.Loose}
+        connectionLineType={ConnectionLineType.Bezier}
+        connectionRadius={30}
+        defaultViewport={initialViewport ?? { x: 0, y: 0, zoom: 1 }}
+        fitView={!initialViewport}
+        fitViewOptions={{ padding: 0.25, maxZoom: 1 }}
+        minZoom={0.15}
+        maxZoom={2.5}
+        panOnScroll
+        panOnDrag
+        zoomOnPinch
+        zoomOnScroll={false}
+        zoomOnDoubleClick={false}
+        nodeDragThreshold={3}
+        selectionKeyCode="Shift"
+        multiSelectionKeyCode={['Meta', 'Shift']}
+        deleteKeyCode={null}
+        selectNodesOnDrag={false}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={26} size={1.6} />
+      </ReactFlow>
+
+      {nodes.length === 0 && (
+        <div className="canvas-empty">
+          <p className="canvas-empty-title">{world ? world.empty[0] : 'A blank canvas'}</p>
+          <p>{world ? world.empty[1] : 'Double-click anywhere to drop your first note.'}</p>
+        </div>
+      )}
+
+      <Dock
+        onNewCard={() => addCardAtScreenPoint(window.innerWidth / 2, window.innerHeight / 2 - 60)}
+        onOpenSettings={() => setSettingsOpen((open) => !open)}
+        helpOpen={helpOpen}
+        setHelpOpen={setHelpOpen}
+      />
+      <Hud />
+      <Toast />
+      <SettingsPanel isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

@@ -1,0 +1,141 @@
+/*
+ * Shared writing typography. Used by the inline card editor and the focus editor,
+ * so text looks identical in both (the focus editor only scales it up).
+ */
+
+.prose {
+  font-family: var(--font-writing);
+  font-size: var(--prose-size, var(--writing-size));
+  line-height: var(--writing-leading);
+  color: var(--text);
+  outline: none;
+  font-optical-sizing: auto;
+  font-kerning: normal;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+  caret-color: var(--accent);
+}
+
+.prose > * {
+  margin: 0;
+}
+
+.prose > * + * {
+  margin-top: 0.7em;
+}
+
+.prose h1,
+.prose h2,
+.prose h3 {
+  font-family: var(--font-heading);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--heading-tracking);
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.prose h1 {
+  font-size: 1.6em;
+}
+
+.prose h2 {
+  font-size: 1.28em;
+}
+
+.prose h3 {
+  font-size: 1.08em;
+}
+
+.prose > * + h1,
+.prose > * + h2,
+.prose > * + h3 {
+  margin-top: 1.15em;
+}
+
+.prose h1 + *,
+.prose h2 + *,
+.prose h3 + * {
+  margin-top: 0.4em;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.3em;
+}
+
+.prose li {
+  margin: 0.22em 0;
+  padding-left: 0.15em;
+}
+
+.prose li::marker {
+  color: var(--text-3);
+}
+
+.prose li p {
+  margin: 0;
+}
+
+.prose strong {
+  font-weight: 650;
+}
+
+.prose a {
+  color: var(--accent-strong);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.prose blockquote {
+  border-left: 2px solid var(--accent);
+  padding-left: 1em;
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--surface-2);
+  border-radius: 5px;
+  padding: 0.12em 0.36em;
+}
+
+.prose pre {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 0.9em 1em;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+.prose pre code {
+  background: none;
+  padding: 0;
+}
+
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.4em 0;
+}
+
+/* Placeholder for an empty note */
+.prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-3);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* The first "@summary …" line — what the note collapses to in summary view */
+.prose .summary-line-highlight {
+  font-family: var(--font-ui);
+  font-size: 0.82em;
+  line-height: 1.45;
+  color: var(--text-2);
+  background: var(--accent-soft);
+  border-radius: 8px;
+  padding: 0.5em 0.75em;
+}

@@ -1,13 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useReactFlow, getNodesBounds, getViewportForBounds } from 'reactflow';
 import jsPDF from 'jspdf';
-import './Export.css';
+import { Download, Loader2, Image as ImageIcon, FileText } from 'lucide-react';
 
 interface ExportProps {
   className?: string;
 }
 
-export function Export({ className }: ExportProps) {
+export function Export(_props: ExportProps) {
   const [showPopover, setShowPopover] = useState(false);
   const [exporting, setExporting] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -71,7 +71,7 @@ export function Export({ className }: ExportProps) {
       // Use html2canvas to capture the canvas
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await html2canvas(viewportElement, {
-        backgroundColor: '#F5F0E8',
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim(),
         scale: 2,
         logging: false,
       });
@@ -106,7 +106,7 @@ export function Export({ className }: ExportProps) {
       // Use html2canvas to capture the canvas
       const html2canvas = (await import('html2canvas')).default;
       const canvas = await html2canvas(viewportElement, {
-        backgroundColor: '#F5F0E8',
+        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--canvas-bg').trim(),
         scale: 2,
         logging: false,
       });
@@ -139,45 +139,35 @@ export function Export({ className }: ExportProps) {
   };
 
   return (
-    <div className={`export-container ${className || ''}`}>
+    <div className="dock-popover-anchor">
       <button
         ref={buttonRef}
-        className="export-button"
+        className={`dock-btn${showPopover ? ' is-active' : ''}`}
         onClick={() => setShowPopover(!showPopover)}
-        title="Export Board"
+        data-tip={showPopover ? undefined : 'Export'}
+        aria-label="Export"
         disabled={exporting}
       >
-        {exporting ? '⏳' : '📥'}
+        {exporting ? <Loader2 size={17} className="spin" /> : <Download size={17} />}
       </button>
 
       {showPopover && (
-        <div ref={popoverRef} className="export-popover">
-          <div className="export-popover-header">
-            <span className="export-popover-title">Export Board</span>
-          </div>
-          <div className="export-popover-options">
-            <button
-              className="export-option-button"
-              onClick={exportToPNG}
-              disabled={exporting}
-            >
-              <span className="export-option-icon">🖼️</span>
-              <div className="export-option-text">
-                <span className="export-option-label">PNG Image</span>
-                <span className="export-option-description">High quality raster image</span>
-              </div>
+        <div ref={popoverRef} className="dock-popover dock-popover--end" style={{ width: 240 }}>
+          <div className="dock-popover-title">Export board</div>
+          <div className="dock-menu">
+            <button className="dock-menu-item" onClick={exportToPNG} disabled={exporting}>
+              <ImageIcon size={18} />
+              <span>
+                <strong>PNG image</strong>
+                <small>High-resolution picture</small>
+              </span>
             </button>
-
-            <button
-              className="export-option-button"
-              onClick={exportToPDF}
-              disabled={exporting}
-            >
-              <span className="export-option-icon">📄</span>
-              <div className="export-option-text">
-                <span className="export-option-label">PDF Document</span>
-                <span className="export-option-description">Portable document format</span>
-              </div>
+            <button className="dock-menu-item" onClick={exportToPDF} disabled={exporting}>
+              <FileText size={18} />
+              <span>
+                <strong>PDF document</strong>
+                <small>For sharing or printing</small>
+              </span>
             </button>
           </div>
         </div>

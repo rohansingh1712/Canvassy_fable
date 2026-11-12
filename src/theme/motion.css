@@ -1,0 +1,147 @@
+/*
+ * Motion that belongs to a vibe but lives on the notes, arrows and dock
+ * (the backdrop's own animation is in components/Backdrop).
+ * Lamplight and Midnight define nothing here on purpose.
+ */
+
+/* Little lights that travel along arrows */
+.connection-flow {
+  display: none;
+  fill: none;
+  pointer-events: none;
+  stroke-linecap: round;
+}
+
+@keyframes edge-flow {
+  to { stroke-dashoffset: -34; }
+}
+
+/* ── Beach day: slow and easy ── */
+[data-theme='beach'] .connection-flow {
+  display: block;
+  stroke: var(--accent);
+  stroke-width: 5px;
+  stroke-dasharray: 0.1 33.9;
+  animation: edge-flow 2.6s linear infinite;
+}
+
+/* ── Playground: springy ── */
+[data-theme='fun'] .card {
+  animation: card-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease, transform 0.35s cubic-bezier(0.34, 1.8, 0.64, 1);
+}
+
+@keyframes card-pop {
+  from { transform: scale(0.6) rotate(-8deg); opacity: 0; }
+}
+
+[data-theme='fun'] .card:hover:not(.is-editing):not(.is-dragging) {
+  transform: translate(-2px, -3px) rotate(-0.8deg);
+}
+
+[data-theme='fun'] .card[data-tint='1']:hover:not(.is-editing):not(.is-dragging),
+[data-theme='fun'] .card[data-tint='3']:hover:not(.is-editing):not(.is-dragging) {
+  transform: translate(-2px, -3px) rotate(0.8deg);
+}
+
+[data-theme='fun'] .dock-btn {
+  transition: background-color 0.12s ease, color 0.12s ease, transform 0.3s cubic-bezier(0.34, 2.2, 0.64, 1);
+}
+
+[data-theme='fun'] .dock-btn:hover:not(:disabled) {
+  transform: translateY(-4px) rotate(-8deg) scale(1.08);
+}
+
+[data-theme='fun'] .dock-btn--primary {
+  animation: fun-nudge 2.4s ease-in-out infinite;
+}
+
+@keyframes fun-nudge {
+  0%, 70%, 100% { transform: rotate(0deg) scale(1); }
+  78% { transform: rotate(-14deg) scale(1.12); }
+  86% { transform: rotate(12deg) scale(1.12); }
+  94% { transform: rotate(-6deg) scale(1.05); }
+}
+
+/* ── Afterhours: everything is on the beat (120 bpm) ── */
+[data-theme='party'] .card::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 1.5px var(--glow, #FF3DC8), 0 0 30px var(--glow, #FF3DC8);
+  opacity: 0.15;
+  animation: card-beat 1s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+}
+
+[data-theme='party'] .card[data-tint='1'] { --glow: #22E3FF; }
+[data-theme='party'] .card[data-tint='2'] { --glow: #A05AFF; }
+[data-theme='party'] .card[data-tint='3'] { --glow: #FFC24B; }
+[data-theme='party'] .card[data-tint='1']::after,
+[data-theme='party'] .card[data-tint='3']::after { animation-delay: -0.5s; }
+
+/* Hold a steady glow on the note you're writing in so the text stays readable */
+[data-theme='party'] .card.is-editing::after {
+  animation: none;
+  opacity: 0.55;
+}
+
+@keyframes card-beat {
+  0% { opacity: 0.9; }
+  100% { opacity: 0.1; }
+}
+
+[data-theme='party'] .connection-flow {
+  display: block;
+  stroke: #FFFFFF;
+  stroke-width: 3px;
+  stroke-dasharray: 4 30;
+  filter: drop-shadow(0 0 5px #22E3FF);
+  animation: edge-flow 0.5s linear infinite;
+}
+
+[data-theme='party'] .prose h1,
+[data-theme='party'] .card--summary span {
+  background: linear-gradient(90deg, #FF3DC8, #22E3FF, #A05AFF, #FF3DC8);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: text-shimmer 4s linear infinite;
+}
+
+@keyframes text-shimmer {
+  to { background-position: -300% 0; }
+}
+
+[data-theme='party'] .dock-btn--primary {
+  animation: btn-beat 0.5s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+}
+
+@keyframes btn-beat {
+  0% { transform: scale(1.14); box-shadow: 0 0 22px #FF3DC8; }
+  100% { transform: scale(1); box-shadow: 0 0 0 #FF3DC8; }
+}
+
+[data-theme='party'] .dock {
+  animation: dock-hue 6s linear infinite;
+}
+
+@keyframes dock-hue {
+  0%, 100% { border-color: #FF3DC8; }
+  33% { border-color: #22E3FF; }
+  66% { border-color: #A05AFF; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card::after,
+  .connection-flow,
+  .dock,
+  .dock-btn,
+  .prose h1,
+  .card--summary span {
+    animation: none !important;
+  }
+}

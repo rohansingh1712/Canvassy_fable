@@ -1,56 +1,323 @@
+/*
+ * Design tokens. Every colour, font, radius and shadow in the app comes from here.
+ * A theme ("vibe") is a block of overrides keyed on <html data-theme="…">.
+ * To add a vibe: add a block below and an entry in theme/themes.ts.
+ */
+
 :root {
-  /* Base Colors */
-  --color-canvas-bg: #F5F0E8;
-  --color-card-bg: #FDFAF5;
-  --color-card-summary-bg: #F0EBE1;
-  --color-card-border: #E2D9CC;
-  --color-text-primary: #2A1F1A;
-  --color-text-secondary: #8C7B6E;
-  --color-text-muted: #B5A99A;
+  /* Lamplight (default) — warm desk lamp at night */
+  --canvas-bg: #F4EEE4;
+  --canvas-image: radial-gradient(1200px 800px at 70% -10%, #FCF5E6 0%, rgba(252, 245, 230, 0) 60%);
+  --canvas-dot: #DCD0BF;
 
-  /* Accent (Dusty Rose) */
-  --color-accent: #C08B85;
-  --color-accent-hover: #AE7A74;
-  --color-accent-soft: #EDD9D6;
+  --card-bg: #FFFCF6;
+  --card-border: #E6DCCD;
+  --surface: #FFFCF6;
+  --surface-2: #F3ECE0;
+  --border: #E6DCCD;
+  --border-w: 1px;
 
-  /* Functional Colors */
-  --color-word-count-warn: #C9924A;
-  --color-word-count-limit: #B85C4A;
-  --color-connection-default: #B5A99A;
-  --color-connection-selected: #C08B85;
+  --text: #2A1F1A;
+  --text-2: #7A6A5D;
+  --text-3: #B0A292;
 
-  /* Typography */
-  --font-writing: 'Lora', Georgia, serif;
-  --font-ui: 'Inter', system-ui, sans-serif;
+  --accent: #B9766E;
+  --accent-strong: #A0625B;
+  --accent-soft: #F0DDD9;
+  --accent-contrast: #FFFFFF;
+  --edge: #A89A8A;
+  --danger: #B85C4A;
+  --warn: #C9924A;
+  --selection: rgba(185, 118, 110, 0.22);
 
-  /* Type Scale */
-  --text-card-body: 16px;
-  --text-card-summary: 13px;
-  --text-label: 11px;
-  --text-connection-label: 12px;
+  --shadow-card: 0 1px 2px rgba(42, 31, 26, 0.05), 0 4px 16px rgba(42, 31, 26, 0.06);
+  --shadow-hover: 0 1px 2px rgba(42, 31, 26, 0.06), 0 8px 24px rgba(42, 31, 26, 0.10);
+  --shadow-lift: 0 2px 4px rgba(42, 31, 26, 0.06), 0 18px 40px rgba(42, 31, 26, 0.18);
+  --shadow-pop: 0 2px 6px rgba(42, 31, 26, 0.06), 0 12px 32px rgba(42, 31, 26, 0.14);
+  --ring: 0 0 0 2px var(--accent);
 
-  /* Spacing */
-  --card-width: 320px;
-  --card-border-radius: 12px;
-  --header-height: 28px;
+  --radius-card: 14px;
+  --radius-ui: 10px;
+
+  --font-writing: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --font-heading: 'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --heading-weight: 600;
+  --heading-tracking: -0.01em;
+  --writing-size: 16.5px;
+  --writing-leading: 1.6;
+
+  color-scheme: light;
+}
+
+/* Beach day — sky fading into sand, sea-glass and coral */
+[data-theme='beach'] {
+  --canvas-bg: #FBF1DC;
+  --canvas-image: linear-gradient(180deg, #BDE8F2 0%, #E2F4EE 30%, #FBF1DC 62%);
+  --canvas-dot: #E4D2A6;
+  --card-bg: #FFFFFF;
+  --card-border: #EADFC6;
+  --surface: #FFFFFF;
+  --surface-2: #EEF7F7;
+  --border: #DCE8E5;
+  --text: #1F3A44;
+  --text-2: #5E7A82;
+  --text-3: #9DB2B6;
+  --accent: #FF7A59;
+  --accent-strong: #E9603F;
+  --accent-soft: #FFE3D9;
+  --edge: #3AA6B9;
+  --danger: #D9534F;
+  --warn: #E0A030;
+  --selection: rgba(58, 166, 185, 0.25);
+  --shadow-card: 0 1px 2px rgba(31, 58, 68, 0.05), 0 6px 18px rgba(31, 58, 68, 0.08);
+  --shadow-hover: 0 1px 2px rgba(31, 58, 68, 0.06), 0 10px 26px rgba(31, 58, 68, 0.12);
+  --shadow-lift: 0 2px 4px rgba(31, 58, 68, 0.06), 0 20px 44px rgba(31, 58, 68, 0.2);
+  --shadow-pop: 0 2px 6px rgba(31, 58, 68, 0.06), 0 12px 32px rgba(31, 58, 68, 0.16);
+  --radius-card: 20px;
+  --radius-ui: 14px;
+  --font-writing: 'DM Sans', system-ui, sans-serif;
+  --font-heading: 'Fraunces', Georgia, serif;
+  --writing-size: 16px;
+}
+
+/* Afterhours — dark room, neon, bass */
+[data-theme='party'] {
+  --canvas-bg: #0A0614;
+  --canvas-image:
+    radial-gradient(60% 50% at 15% 20%, rgba(255, 43, 214, 0.30), rgba(255, 43, 214, 0) 70%),
+    radial-gradient(50% 50% at 85% 25%, rgba(0, 229, 255, 0.24), rgba(0, 229, 255, 0) 70%),
+    radial-gradient(60% 60% at 50% 100%, rgba(124, 58, 255, 0.38), rgba(124, 58, 255, 0) 70%);
+  --canvas-dot: rgba(255, 255, 255, 0.12);
+  --card-bg: #150E2B;
+  --card-border: #3B2A70;
+  --surface: #1A1233;
+  --surface-2: #2A1D52;
+  --border: #3B2A70;
+  --text: #F4EEFF;
+  --text-2: #B7A8DE;
+  --text-3: #7A6CA8;
+  --accent: #FF3DC8;
+  --accent-strong: #FF74D9;
+  --accent-soft: #3D1454;
+  --accent-contrast: #14061F;
+  --edge: #22E3FF;
+  --danger: #FF5C7A;
+  --warn: #FFC24B;
+  --selection: rgba(34, 227, 255, 0.3);
+  --shadow-card: 0 0 0 1px rgba(255, 61, 200, 0.06), 0 8px 30px rgba(0, 0, 0, 0.5);
+  --shadow-hover: 0 0 0 1px rgba(255, 61, 200, 0.35), 0 0 28px rgba(255, 61, 200, 0.22);
+  --shadow-lift: 0 0 0 1px #FF3DC8, 0 0 48px rgba(255, 61, 200, 0.5);
+  --shadow-pop: 0 0 0 1px rgba(34, 227, 255, 0.2), 0 16px 40px rgba(0, 0, 0, 0.6);
+  --radius-card: 16px;
+  --font-writing: 'Space Grotesk', system-ui, sans-serif;
+  --font-heading: 'Space Grotesk', system-ui, sans-serif;
+  --font-ui: 'Space Grotesk', system-ui, sans-serif;
+  --heading-weight: 700;
+  --heading-tracking: -0.02em;
+  --writing-size: 16px;
+  color-scheme: dark;
+}
+
+/* Playground — sticker-book colours, chunky outlines */
+[data-theme='fun'] {
+  --canvas-bg: #FFF7E8;
+  --canvas-image: none;
+  --canvas-dot: #FFB3D0;
+  --card-bg: #FFFFFF;
+  --card-border: #1D1D1F;
+  --surface: #FFFFFF;
+  --surface-2: #FFEDBD;
+  --border: #1D1D1F;
+  --border-w: 2px;
+  --text: #1D1D1F;
+  --text-2: #55555C;
+  --text-3: #8E8E98;
+  --accent: #5B5BFF;
+  --accent-strong: #4040E0;
+  --accent-soft: #E1E1FF;
+  --edge: #1D1D1F;
+  --danger: #E5484D;
+  --warn: #D97706;
+  --selection: rgba(91, 91, 255, 0.25);
+  --shadow-card: 4px 4px 0 #1D1D1F;
+  --shadow-hover: 5px 5px 0 #1D1D1F;
+  --shadow-lift: 10px 10px 0 #1D1D1F;
+  --shadow-pop: 4px 4px 0 #1D1D1F;
+  --radius-card: 14px;
+  --radius-ui: 12px;
+  --font-writing: 'DM Sans', system-ui, sans-serif;
+  --font-heading: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-ui: 'DM Sans', system-ui, sans-serif;
+  --heading-weight: 750;
+  --heading-tracking: -0.02em;
+  --writing-size: 16px;
+  --tint-0: #FFE680;
+  --tint-1: #B9F3CB;
+  --tint-2: #FFC6DF;
+  --tint-3: #C2E4FF;
+}
+
+/* Midnight — quiet, low-contrast dark for long sessions */
+[data-theme='night'] {
+  --canvas-bg: #12151C;
+  --canvas-image: radial-gradient(900px 600px at 50% -10%, #1D2433 0%, rgba(29, 36, 51, 0) 70%);
+  --canvas-dot: #272D3B;
+  --card-bg: #1A1E28;
+  --card-border: #2A3040;
+  --surface: #1D222D;
+  --surface-2: #272D3B;
+  --border: #2F3647;
+  --text: #DDE1EA;
+  --text-2: #8E97AB;
+  --text-3: #5C6579;
+  --accent: #8FB4FF;
+  --accent-strong: #ABC7FF;
+  --accent-soft: #24324F;
+  --accent-contrast: #0E1320;
+  --edge: #5C6A85;
+  --danger: #F0707A;
+  --warn: #E2B55A;
+  --selection: rgba(143, 180, 255, 0.28);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.28);
+  --shadow-hover: 0 1px 2px rgba(0, 0, 0, 0.3), 0 10px 28px rgba(0, 0, 0, 0.38);
+  --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.3), 0 22px 48px rgba(0, 0, 0, 0.55);
+  --shadow-pop: 0 2px 6px rgba(0, 0, 0, 0.3), 0 14px 36px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
   padding: 0;
+  overscroll-behavior: none;
+}
+
+body {
   font-family: var(--font-ui);
-  color: var(--color-text-primary);
-  background: var(--color-canvas-bg);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+  background: var(--canvas-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.35s ease, color 0.35s ease;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/*
+ * Worlds — themes with the game layer on (see src/game). Pixel headings, chunky borders,
+ * hard shadows; the writing font stays a plain, readable sans.
+ */
+[data-world] {
+  --canvas-image: none;
+  --canvas-dot: transparent;
+  --border-w: 2px;
+  --radius-card: 8px;
+  --radius-ui: 8px;
+  --font-writing: 'DM Sans', system-ui, sans-serif;
+  --font-heading: 'Pixelify Sans', 'DM Sans', system-ui, sans-serif;
+  --font-ui: 'DM Sans', system-ui, sans-serif;
+  --heading-weight: 600;
+  --heading-tracking: 0;
+  --writing-size: 16px;
+  --shadow-card: 0 5px 0 rgba(0, 0, 0, 0.22);
+  --shadow-hover: 0 6px 0 rgba(0, 0, 0, 0.26);
+  --shadow-lift: 0 22px 0 -4px rgba(0, 0, 0, 0.16);
+  --shadow-pop: 0 5px 0 rgba(0, 0, 0, 0.22);
+}
+
+/* Village — meadow, timber and parchment */
+[data-theme='village'] {
+  --canvas-bg: #8BC46A;
+  --card-bg: #FFF8E7;
+  --card-border: #5B3A29;
+  --surface: #FFF8E7;
+  --surface-2: #F1E3C4;
+  --border: #5B3A29;
+  --text: #3B2A20;
+  --text-2: #7A5C48;
+  --text-3: #B39B82;
+  --accent: #D9562B;
+  --accent-strong: #B8431E;
+  --accent-soft: #FBE1C8;
+  --accent-contrast: #FFFFFF;
+  --edge: #7A5230;
+  --danger: #C0392B;
+  --warn: #C98A1B;
+  --selection: rgba(217, 86, 43, 0.25);
+}
+
+/* City — pavement, asphalt and glass */
+[data-theme='city'] {
+  --canvas-bg: #D5DBE1;
+  --card-bg: #FFFFFF;
+  --card-border: #2B3140;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1F5;
+  --border: #2B3140;
+  --text: #1F2430;
+  --text-2: #5B6475;
+  --text-3: #9AA3B2;
+  --accent: #2F6BFF;
+  --accent-strong: #1E54D6;
+  --accent-soft: #DCE7FF;
+  --accent-contrast: #FFFFFF;
+  --edge: #2B3140;
+  --danger: #D64545;
+  --warn: #C98A1B;
+  --selection: rgba(47, 107, 255, 0.22);
+}
+
+/* Outer space — deep navy, cyan glow */
+[data-theme='space'] {
+  --canvas-bg: #0B1026;
+  --canvas-image: radial-gradient(900px 600px at 18% 8%, rgba(120, 70, 200, 0.38) 0%, rgba(120, 70, 200, 0) 70%),
+    radial-gradient(800px 600px at 88% 85%, rgba(30, 120, 200, 0.3) 0%, rgba(30, 120, 200, 0) 70%);
+  --card-bg: #141B3A;
+  --card-border: #4C5CA8;
+  --surface: #141B3A;
+  --surface-2: #1E2850;
+  --border: #4C5CA8;
+  --text: #E6ECFF;
+  --text-2: #9AA6D1;
+  --text-3: #5F6B99;
+  --accent: #6EE7F9;
+  --accent-strong: #A5F3FC;
+  --accent-soft: #1D2A55;
+  --accent-contrast: #0B1026;
+  --edge: #6EE7F9;
+  --danger: #FF6B81;
+  --warn: #FFC857;
+  --selection: rgba(110, 231, 249, 0.22);
+  --shadow-card: 0 0 0 1px rgba(110, 231, 249, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-hover: 0 0 18px rgba(110, 231, 249, 0.25), 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-lift: 0 0 28px rgba(110, 231, 249, 0.35), 0 24px 40px rgba(0, 0, 0, 0.6);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
 }

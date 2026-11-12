@@ -1,314 +1,345 @@
 import { create } from 'zustand';
-import { Node, Edge, Connection, applyNodeChanges, applyEdgeChanges } from 'reactflow';
+import {
+  Node,
+  Edge,
+  Connection,
+  Viewport,
+  NodeChange,
+  EdgeChange,
+  applyNodeChanges,
+  applyEdgeChanges,
+} from 'reactflow';
+import { extractSummary } from '../utils/markdown';
+import { countWords } from '../utils/wordCount';
 
 export interface CardData {
   id: string;
   body: string;
   summary: string;
   wordCount: number;
+  /** Set on creation so the card grabs focus; never persisted. */
   isNew?: boolean;
+}
+
+export interface EdgeData {
+  label?: string;
+  lineStyle?: 'solid' | 'dashed' | 'dotted';
+  directionality?: 'forward' | 'backward' | 'both' | 'none';
+}
+
+interface Snapshot {
+  nodes: Node<CardData>[];
+  edges: Edge<EdgeData>[];
+}
+
+export interface Toast {
+  id: number;
+  message: string;
+  undoable?: boolean;
 }
 
 interface CanvasState {
   nodes: Node<CardData>[];
-  edges: Edge[];
-  isSpacebarHeld: boolean;
-  draggingNodeId: string | null;
+  edges: Edge<EdgeData>[];
+  past: Snapshot[];
+  future: Snapshot[];
   isConnecting: boolean;
-  connectionSourceNode: string | null;
-  connectionTargetNode: string | null;
-  addCard: (position: { x: number; y: number }) => void;
-  addWelcomeCard: () => void;
+  toast: Toast | null;
+
+  addCard: (position: { x: number; y: number }, options?: { linkFrom?: string; body?: string }) => string;
+  addWelcomeCards: (origin?: { x: number; y: number }) => void;
   deleteCard: (id: string) => void;
+  deleteSelected: () => boolean;
   updateCard: (id: string, data: Partial<CardData>) => void;
-  onNodesChange: (changes: any) => void;
-  onEdgesChange: (changes: any) => void;
+  onNodesChange: (changes: NodeChange[]) => void;
+  onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
-  updateEdge: (id: string, data: Partial<Edge>) => void;
+  connectNodes: (source: string, target: string) => void;
+  updateEdge: (id: string, data: Partial<EdgeData>) => void;
   deleteEdge: (id: string) => void;
-  setSpacebarHeld: (held: boolean) => void;
-  setDraggingNodeId: (id: string | null) => void;
-  setConnectionState: (isConnecting: boolean, sourceNode: string | null, targetNode: string | null) => void;
-  clearConnectionState: () => void;
-  loadFromLocalStorage: () => void;
-  saveToLocalStorage: () => void;
+  /** Record the current state so the next change can be undone. */
+  snapshot: () => void;
+  undo: () => void;
+  redo: () => void;
+  setConnecting: (connecting: boolean) => void;
+  showToast: (message: string, undoable?: boolean) => void;
+  dismissToast: () => void;
 }
 
 const STORAGE_KEY = 'canvassy-data';
+const VIEWPORT_KEY = 'canvassy-viewport';
+const HISTORY_LIMIT = 60;
 
-// Helper function to calculate optimal target handle based on geometric relationship
-function calculateOptimalHandle(sourceNode: Node | undefined, targetNode: Node | undefined): string {
-  if (!sourceNode || !targetNode) return 'top';
+const uid = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-  // Get center positions of both cards
-  // Full view: 320px width, ~200px height
-  // Summary view: 280px width, similar height
-  const sourceCenterX = sourceNode.position.x + 160;
-  const sourceCenterY = sourceNode.position.y + 100;
-  const targetCenterX = targetNode.position.x + 160;
-  const targetCenterY = targetNode.position.y + 100;
+function makeCard(position: { x: number; y: number }, body = '', isNew = false): Node<CardData> {
+  const id = uid('card');
+  return {
+    id,
+    type: 'customCard',
+    position,
+    data: { id, body, summary: extractSummary(body), wordCount: countWords(body), isNew },
+  };
+}
 
-  // Calculate angle from source to target
-  const dx = targetCenterX - sourceCenterX;
-  const dy = targetCenterY - sourceCenterY;
-  const angleRadians = Math.atan2(dy, dx);
-  const angleDegrees = (angleRadians * 180) / Math.PI;
+function makeEdge(source: string, target: string, data: EdgeData = {}): Edge<EdgeData> {
+  return { id: uid('edge'), source, target, data };
+}
 
-  // Map angle to nearest handle
-  // -45° to 45° → right (target is to the right)
-  // 45° to 135° → bottom (target is below)
-  // 135° to -135° (beyond ±135°) → left (target is to the left)
-  // -135° to -45° → top (target is above)
-  if (angleDegrees >= -45 && angleDegrees < 45) {
-    return 'left'; // Target is to the right, so connect to its left handle
-  } else if (angleDegrees >= 45 && angleDegrees < 135) {
-    return 'top'; // Target is below, so connect to its top handle
-  } else if (angleDegrees >= 135 || angleDegrees < -135) {
-    return 'right'; // Target is to the left, so connect to its right handle
-  } else {
-    return 'bottom'; // Target is above, so connect to its bottom handle
+function welcomeSet(origin = { x: 0, y: 0 }): Snapshot {
+  const intro = makeCard(
+    origin,
+    `# Welcome to Canvassy
+
+A place to think in space. Scatter half-formed ideas across the canvas, draw lines between them, then zoom into one and write.
+
+@summary Start here`
+  );
+  const moving = makeCard(
+    { x: origin.x + 520, y: origin.y - 60 },
+    `## Getting around
+
+- **Double-click** the canvas for a new note, or press **N**
+- **Scroll** to pan, **pinch** to zoom
+- **Drag** a note anywhere to move it
+- **⌘Z** undoes anything, including deletes
+
+@summary Getting around`
+  );
+  const linking = makeCard(
+    { x: origin.x + 520, y: origin.y + 300 },
+    `## Connecting ideas
+
+- Drag from a dot on a note's edge onto another note
+- Drop the line on **empty canvas** to spin off a new linked note
+- Click a line to restyle it, double-click to label it
+
+@summary Connecting ideas`
+  );
+  const writing = makeCard(
+    { x: origin.x, y: origin.y + 330 },
+    `## Writing
+
+Notes take Markdown. Press **⌘↵** to open one in focus mode. Add a line starting with \`@summary\` and it becomes the note's title in summary view (**S**).
+
+Try a different vibe with **T**.
+
+@summary Writing`
+  );
+  return {
+    nodes: [intro, moving, linking, writing],
+    edges: [
+      makeEdge(intro.id, moving.id),
+      makeEdge(intro.id, linking.id),
+      makeEdge(intro.id, writing.id, { lineStyle: 'dashed' }),
+    ],
+  };
+}
+
+function load(): Snapshot {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const { nodes = [], edges = [] } = JSON.parse(stored);
+      return {
+        nodes: nodes.map((n: Node<CardData>) => ({ ...n, selected: false, dragging: false })),
+        // Lines pick their own sides now, so handle ids saved by older versions are dropped.
+        edges: edges.map(({ sourceHandle, targetHandle, ...e }: Edge<EdgeData>) => ({ ...e, selected: false })),
+      };
+    }
+  } catch (error) {
+    console.error('Failed to load from localStorage:', error);
+  }
+  return welcomeSet();
+}
+
+export function loadViewport(): Viewport | null {
+  try {
+    const stored = localStorage.getItem(VIEWPORT_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
   }
 }
 
-export const useCanvasStore = create<CanvasState>((set, get) => ({
-  nodes: [],
-  edges: [],
-  isSpacebarHeld: false,
-  draggingNodeId: null,
-  isConnecting: false,
-  connectionSourceNode: null,
-  connectionTargetNode: null,
+export function saveViewport(viewport: Viewport) {
+  try {
+    localStorage.setItem(VIEWPORT_KEY, JSON.stringify(viewport));
+  } catch {
+    /* ignore */
+  }
+}
 
-  addCard: (position) => {
-    const newCard: Node<CardData> = {
-      id: `card-${Date.now()}`,
-      type: 'customCard',
-      position,
-      data: {
-        id: `card-${Date.now()}`,
-        body: '',
-        summary: '',
-        wordCount: 0,
-        isNew: true,
-      },
-    };
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let toastCounter = 0;
 
-    set((state) => ({
-      nodes: [...state.nodes, newCard],
-    }));
-
-    get().saveToLocalStorage();
-  },
-
-  addWelcomeCard: () => {
-    const welcomeCard: Node<CardData> = {
-      id: `card-${Date.now()}`,
-      type: 'customCard',
-      position: { x: 100, y: 100 },
-      data: {
-        id: `card-${Date.now()}`,
-        body: `# Welcome to canvassy
-
-Canvassy is a writing tool that lets you rearrange your notes spatially.
-
-
-It's most useful for starting first drafts and capturing ideas that loosely relate to each other. Use the canvas to move your ideas around, connect them in different ways, and shape the the next draft.
-
-## How to use canvassy
-* **Double click** anywhere to create a new note.
-* Use **markdown** to write notes.
-* Use the **connectors** to connect ideas.
-* **Grab** the note header to move it.
-* Hit **spacebar** to move the canvas, try pinching to zoom.
-* Write **@summary** in cards and try out the summary mode to see your ideas at a high level.
-* Use **focus mode 🧘** to write in a card distraction free.
-* **Export** your note to save a copy.`,
-        summary: 'Welcome card — explains how to use Canvassy',
-        wordCount: 122,
-      },
-    };
-
-    set((state) => ({
-      nodes: [...state.nodes, welcomeCard],
-    }));
-
-    get().saveToLocalStorage();
-  },
-
-  deleteCard: (id) => {
-    set((state) => ({
-      nodes: state.nodes.filter((node) => node.id !== id),
-      edges: state.edges.filter((edge) => edge.source !== id && edge.target !== id),
-    }));
-
-    get().saveToLocalStorage();
-  },
-
-  updateCard: (id, data) => {
-    set((state) => ({
-      nodes: state.nodes.map((node) =>
-        node.id === id
-          ? { ...node, data: { ...node.data, ...data } }
-          : node
-      ),
-    }));
-
-    get().saveToLocalStorage();
-  },
-
-  onNodesChange: (changes) => {
-    set((state) => ({
-      nodes: applyNodeChanges(changes, state.nodes),
-    }));
-    get().saveToLocalStorage();
-  },
-
-  onEdgesChange: (changes) => {
-    set((state) => ({
-      edges: applyEdgeChanges(changes, state.edges),
-    }));
-    get().saveToLocalStorage();
-  },
-
-  onConnect: (connection) => {
-    // Get source and target nodes from state
-    const sourceNode = get().nodes.find(n => n.id === connection.source);
-    const targetNode = get().nodes.find(n => n.id === connection.target);
-
-    // Calculate optimal handles based on geometric positions
-    const optimalTargetHandle = calculateOptimalHandle(sourceNode, targetNode);
-
-    // If source used the center handle, calculate optimal source handle too
-    let sourceHandle = connection.sourceHandle;
-    if (connection.sourceHandle === 'center') {
-      // Calculate optimal source handle (opposite direction from target)
-      const sourceCenterX = sourceNode!.position.x + 160;
-      const sourceCenterY = sourceNode!.position.y + 100;
-      const targetCenterX = targetNode!.position.x + 160;
-      const targetCenterY = targetNode!.position.y + 100;
-
-      const dx = targetCenterX - sourceCenterX;
-      const dy = targetCenterY - sourceCenterY;
-      const angleRadians = Math.atan2(dy, dx);
-      const angleDegrees = (angleRadians * 180) / Math.PI;
-
-      // Map angle to source handle (opposite of target logic)
-      if (angleDegrees >= -45 && angleDegrees < 45) {
-        sourceHandle = 'right'; // Connecting to the right
-      } else if (angleDegrees >= 45 && angleDegrees < 135) {
-        sourceHandle = 'bottom'; // Connecting downward
-      } else if (angleDegrees >= 135 || angleDegrees < -135) {
-        sourceHandle = 'left'; // Connecting to the left
-      } else {
-        sourceHandle = 'top'; // Connecting upward
-      }
-    }
-
-    const newEdge: Edge = {
-      id: `edge-${Date.now()}`,
-      source: connection.source!,
-      target: connection.target!,
-      sourceHandle: sourceHandle,
-      targetHandle: optimalTargetHandle, // Use calculated optimal handle
-    };
-
-    set((state) => ({
-      edges: [...state.edges, newEdge],
-    }));
-
-    get().saveToLocalStorage();
-  },
-
-  updateEdge: (id, data) => {
-    set((state) => ({
-      edges: state.edges.map((edge) =>
-        edge.id === id ? { ...edge, data: { ...edge.data, ...data } } : edge
-      ),
-    }));
-
-    get().saveToLocalStorage();
-  },
-
-  deleteEdge: (id) => {
-    set((state) => ({
-      edges: state.edges.filter((edge) => edge.id !== id),
-    }));
-
-    get().saveToLocalStorage();
-  },
-
-  setSpacebarHeld: (held) => {
-    set({ isSpacebarHeld: held });
-  },
-
-  setDraggingNodeId: (id) => {
-    set({ draggingNodeId: id });
-  },
-
-  setConnectionState: (isConnecting, sourceNode, targetNode) => {
-    set({
-      isConnecting,
-      connectionSourceNode: sourceNode,
-      connectionTargetNode: targetNode
-    });
-  },
-
-  clearConnectionState: () => {
-    set({
-      isConnecting: false,
-      connectionSourceNode: null,
-      connectionTargetNode: null
-    });
-  },
-
-  loadFromLocalStorage: () => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const { nodes, edges } = JSON.parse(stored);
-        set({ nodes, edges });
-      } else {
-        // Create a default card with content
-        const defaultCard: Node<CardData> = {
-          id: 'default-card',
-          type: 'customCard',
-          position: { x: 100, y: 100 },
-          data: {
-            id: 'default-card',
-            body: `# Welcome to canvassy
-
-Canvassy is a writing tool that lets you rearrange your notes spatially.
-
-
-It's most useful for starting first drafts and capturing ideas that loosely relate to each other. Use the canvas to move your ideas around, connect them in different ways, and shape the the next draft.
-
-## How to use canvassy
-* **Double click** anywhere to create a new note.
-* Use **markdown** to write notes.
-* Use the **connectors** to connect ideas.
-* **Grab** the note header to move it.
-* Hit **spacebar** to move the canvas, try pinching to zoom.
-* Write **@summary** in cards and try out the summary mode to see your ideas at a high level.
-* Use **focus mode 🧘** to write in a card distraction free.
-* **Export** your note to save a copy.`,
-            summary: 'Welcome card — explains how to use Canvassy',
-            wordCount: 122,
-          },
-        };
-
-        set({ nodes: [defaultCard], edges: [] });
-      }
-    } catch (error) {
-      console.error('Failed to load from localStorage:', error);
-    }
-  },
-
-  saveToLocalStorage: () => {
+export const useCanvasStore = create<CanvasState>((set, get) => {
+  const flush = () => {
+    saveTimer = null;
     try {
       const { nodes, edges } = get();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }));
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          nodes: nodes.map(({ selected, dragging, ...n }) => ({ ...n, data: { ...n.data, isNew: undefined } })),
+          edges: edges.map(({ selected, ...e }) => e),
+        })
+      );
     } catch (error) {
       console.error('Failed to save to localStorage:', error);
     }
-  },
-}));
+  };
+
+  // Dragging fires a change per frame, so writes are batched.
+  const persist = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, 250);
+  };
+
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => saveTimer && flush());
+  }
+
+  const current = (): Snapshot => ({ nodes: get().nodes, edges: get().edges });
+
+  return {
+    ...load(),
+    past: [],
+    future: [],
+    isConnecting: false,
+    toast: null,
+
+    snapshot: () => {
+      set((state) => ({
+        past: [...state.past.slice(-(HISTORY_LIMIT - 1)), current()],
+        future: [],
+      }));
+    },
+
+    undo: () => {
+      const { past, future } = get();
+      if (past.length === 0) return;
+      const previous = past[past.length - 1];
+      set({
+        nodes: previous.nodes.map((n) => ({ ...n, selected: false, dragging: false })),
+        edges: previous.edges.map((e) => ({ ...e, selected: false })),
+        past: past.slice(0, -1),
+        future: [current(), ...future],
+        toast: null,
+      });
+      persist();
+    },
+
+    redo: () => {
+      const { past, future } = get();
+      if (future.length === 0) return;
+      const next = future[0];
+      set({
+        nodes: next.nodes,
+        edges: next.edges,
+        past: [...past, current()],
+        future: future.slice(1),
+      });
+      persist();
+    },
+
+    addCard: (position, options = {}) => {
+      get().snapshot();
+      const card = makeCard(position, options.body ?? '', true);
+      set((state) => ({
+        nodes: [...state.nodes.map((n) => (n.selected ? { ...n, selected: false } : n)), card],
+        edges: options.linkFrom ? [...state.edges, makeEdge(options.linkFrom, card.id)] : state.edges,
+      }));
+      persist();
+      return card.id;
+    },
+
+    addWelcomeCards: (origin) => {
+      get().snapshot();
+      const welcome = welcomeSet(origin);
+      set((state) => ({
+        nodes: [...state.nodes, ...welcome.nodes],
+        edges: [...state.edges, ...welcome.edges],
+      }));
+      persist();
+    },
+
+    deleteCard: (id) => {
+      get().snapshot();
+      set((state) => ({
+        nodes: state.nodes.filter((node) => node.id !== id),
+        edges: state.edges.filter((edge) => edge.source !== id && edge.target !== id),
+      }));
+      get().showToast('Note deleted', true);
+      persist();
+    },
+
+    deleteSelected: () => {
+      const { nodes, edges } = get();
+      const nodeIds = new Set(nodes.filter((n) => n.selected).map((n) => n.id));
+      const edgeIds = new Set(edges.filter((e) => e.selected).map((e) => e.id));
+      if (nodeIds.size === 0 && edgeIds.size === 0) return false;
+      get().snapshot();
+      set({
+        nodes: nodes.filter((n) => !nodeIds.has(n.id)),
+        edges: edges.filter((e) => !edgeIds.has(e.id) && !nodeIds.has(e.source) && !nodeIds.has(e.target)),
+      });
+      const message =
+        nodeIds.size > 1 ? `${nodeIds.size} notes deleted` : nodeIds.size === 1 ? 'Note deleted' : 'Connection deleted';
+      get().showToast(message, true);
+      persist();
+      return true;
+    },
+
+    updateCard: (id, data) => {
+      set((state) => ({
+        nodes: state.nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...data } } : node)),
+      }));
+      persist();
+    },
+
+    onNodesChange: (changes) => {
+      set((state) => ({ nodes: applyNodeChanges(changes, state.nodes) }));
+      if (changes.some((c) => c.type === 'position' || c.type === 'remove')) persist();
+    },
+
+    onEdgesChange: (changes) => {
+      set((state) => ({ edges: applyEdgeChanges(changes, state.edges) }));
+    },
+
+    onConnect: (connection) => {
+      if (connection.source && connection.target) get().connectNodes(connection.source, connection.target);
+    },
+
+    connectNodes: (source, target) => {
+      if (source === target) return;
+      const exists = get().edges.some(
+        (e) => (e.source === source && e.target === target) || (e.source === target && e.target === source)
+      );
+      if (exists) return;
+      get().snapshot();
+      set((state) => ({ edges: [...state.edges, makeEdge(source, target)] }));
+      persist();
+    },
+
+    updateEdge: (id, data) => {
+      get().snapshot();
+      set((state) => ({
+        edges: state.edges.map((edge) => (edge.id === id ? { ...edge, data: { ...edge.data, ...data } } : edge)),
+      }));
+      persist();
+    },
+
+    deleteEdge: (id) => {
+      get().snapshot();
+      set((state) => ({ edges: state.edges.filter((edge) => edge.id !== id) }));
+      get().showToast('Connection deleted', true);
+      persist();
+    },
+
+    setConnecting: (isConnecting) => set({ isConnecting }),
+
+    showToast: (message, undoable = false) => set({ toast: { id: ++toastCounter, message, undoable } }),
+    dismissToast: () => set({ toast: null }),
+  };
+});

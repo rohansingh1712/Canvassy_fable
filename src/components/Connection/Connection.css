@@ -1,133 +1,138 @@
-/* Override ReactFlow's pointer-events blocking on edges container */
-/* This allows foreignObject labels to be clickable */
-.react-flow__edges foreignObject {
-  pointer-events: auto !important;
+.connection-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 22px;
+  cursor: pointer;
+  pointer-events: stroke;
 }
 
-.connection-popover-wrapper {
-  overflow: visible;
+.connection-path {
+  fill: none;
+  stroke: var(--edge);
   pointer-events: none;
+  transition: stroke 0.15s ease;
 }
 
-.connection-popover {
-  background: var(--color-card-bg);
-  border: 1px solid var(--color-card-border);
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(42, 31, 26, 0.15);
-  padding: 12px;
-  pointer-events: all;
+.connection-marker {
+  fill: none;
+  stroke: var(--edge);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.react-flow__edge:hover .connection-path,
+.react-flow__edge:hover .connection-marker,
+.react-flow__edge.selected .connection-path,
+.react-flow__edge.selected .connection-marker {
+  stroke: var(--accent);
+}
+
+[data-theme='party'] .connection-path {
+  filter: drop-shadow(0 0 4px var(--edge));
+}
+
+/* Label + toolbar, centred on the line's midpoint */
+.connection-overlay {
+  position: absolute;
+  pointer-events: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.connection-popover-row {
-  display: flex;
   align-items: center;
-  gap: 8px;
+  z-index: 5;
 }
 
-.connection-delete-btn {
-  background: none;
-  border: none;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px;
-  color: var(--color-text-muted);
-  transition: color 0.15s;
+.connection-overlay.is-selected {
+  z-index: 1001;
 }
 
-.connection-delete-btn:hover {
-  color: var(--color-word-count-limit);
+.connection-overlay > * {
+  pointer-events: all;
 }
 
-.connection-popover-close {
-  background: none;
-  border: none;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 8px;
-  color: var(--color-text-muted);
-  transition: color 0.15s;
-  margin-left: auto;
-}
-
-.connection-popover-close:hover {
-  color: var(--color-text-primary);
-}
-
-.connection-control {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-}
-
-.connection-control label {
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.connection-control select {
+.connection-label,
+.connection-label-input {
   font-family: var(--font-ui);
-  font-size: 12px;
-  padding: 4px 8px;
-  border: 1px solid var(--color-card-border);
-  border-radius: 4px;
-  background: var(--color-card-bg);
-  color: var(--color-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--text-2);
+  background: var(--canvas-bg);
+  border: var(--border-w) solid transparent;
+  border-radius: 999px;
+  padding: 3px 10px;
+  text-align: center;
+}
+
+.connection-label {
   cursor: pointer;
+  max-width: 220px;
+  transition: border-color 0.12s ease, color 0.12s ease;
+}
+
+.connection-label:hover,
+.connection-overlay.is-selected .connection-label {
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 .connection-label-input {
-  flex: 1;
-  font-family: var(--font-ui);
-  font-size: 12px;
-  padding: 6px 8px;
-  border: 1px solid var(--color-card-border);
-  border-radius: 4px;
-  background: var(--color-card-bg);
-  color: var(--color-text-primary);
-}
-
-.connection-label-input:focus {
-  outline: 2px solid var(--color-accent-soft);
-  border-color: var(--color-accent);
-}
-
-/* Override ReactFlow's default edge stroke width */
-path.react-flow__edge-path {
-  stroke-width: var(--arrow-width, 2px) !important;
-}
-
-/* Label display foreignObject */
-.connection-label-display {
-  pointer-events: auto !important;
-  overflow: visible;
-}
-
-/* Inline label editor wrapper */
-.connection-label-editor-wrapper {
-  overflow: visible;
-  pointer-events: auto !important;
-}
-
-.connection-label-inline-input {
-  width: 100%;
-  font-family: var(--font-ui);
-  font-size: 16px;
-  padding: 8px 12px;
-  border: 2px solid var(--color-accent);
-  border-radius: 6px;
-  background: var(--color-card-bg);
-  color: var(--color-text-primary);
-  text-align: center;
-  pointer-events: all;
-  box-shadow: 0 2px 8px rgba(42, 31, 26, 0.15);
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--accent);
   outline: none;
+  box-shadow: var(--shadow-pop);
 }
 
-.connection-label-inline-input::placeholder {
-  color: var(--color-text-muted);
+.connection-toolbar {
+  position: absolute;
+  top: calc(100% + 10px);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--surface);
+  border: var(--border-w) solid var(--border);
+  border-radius: var(--radius-ui);
+  box-shadow: var(--shadow-pop);
+  animation: pop-in 0.14s ease-out;
+}
+
+/* With no label the toolbar sits just under the line */
+.connection-overlay > .connection-toolbar:first-child {
+  top: 14px;
+}
+
+.connection-toolbar button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.connection-toolbar button:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.connection-toolbar button.is-danger:hover {
+  color: var(--danger);
+}
+
+.connection-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--border);
+}
+
+/* The line being dragged out of a handle */
+.react-flow__connection-path {
+  stroke: var(--accent);
+  stroke-width: 2px;
+  stroke-dasharray: 5 5;
 }
